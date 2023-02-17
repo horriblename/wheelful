@@ -3,6 +3,27 @@ use gio::prelude::*;
 use gtk::prelude::*;
 use std::f64::consts::PI;
 
+#[derive(Debug)]
+struct Wheel {
+    actions: Vec<ActionBubble>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ActionBubble {
+    name: String,
+    icon: String,
+    command: Option<String>,
+    subwheel: Option<Vec<ActionBubble>>,
+}
+
+impl Wheel {
+    fn new() -> Self {
+        let actions: Vec<ActionBubble> = serde_yaml::from_str(include_str!("default.yaml"))
+            .expect("Error parsing yaml configuration!");
+        Wheel { actions }
+    }
+}
+
 fn canvas_draw_callback(widget: &gtk::DrawingArea, context: &gdk::cairo::Context) -> Inhibit {
     let width: f64 = widget.allocated_width().into();
     let height: f64 = widget.allocated_height().into();
@@ -91,4 +112,16 @@ fn main() {
     });
 
     application.run();
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ActionBubble;
+
+    #[test]
+    fn test_yaml_read() {
+        let values: Vec<ActionBubble> = serde_yaml::from_str(include_str!("default.yaml")).unwrap();
+        assert_eq!(values[0].name, "Music");
+        println!("{values:?}");
+    }
 }

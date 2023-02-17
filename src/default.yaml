@@ -1,0 +1,31 @@
+---
+- name: Music
+  icon: '♪'
+  command: notify-send idk music-something
+- name: Favorites
+  icon: '★'
+  subwheel:
+    - name: Terminal
+      icon: '$'
+      command: foot
+    - name: File Browser
+      icon: '🗄'
+      command: 'xdg-open $HOME'
+- name: Next Workspace
+  icon: '>'
+  command: hyprctl dispatch workspace +1
+- name: idk filler ig
+  icon: '-'
+  command: notify-send Does nothing
+- name: settings
+  icon: '⛭'
+  command: foot nvim ~/repo/dots.nix/flake.nix
+- name: Close Window
+  icon: '⨯'
+  command: hyprctl dispatch killactive
+- name: Previous Workspace
+  icon: '<'
+  command: hyprctl dispatch workspace -1
+- name: idk another filler T.T
+  icon: '-'
+  command: 'notify-send "This also" "does nothing"'
