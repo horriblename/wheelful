@@ -1,5 +1,31 @@
+use gdk::EventMask;
 use gio::prelude::*;
 use gtk::prelude::*;
+use std::f64::consts::PI;
+
+fn canvas_draw_callback(widget: &gtk::DrawingArea, context: &gdk::cairo::Context) -> Inhibit {
+    let width: f64 = widget.allocated_width().into();
+    let height: f64 = widget.allocated_height().into();
+    let style_context = widget.style_context();
+    let color = style_context.color(style_context.state());
+
+    context.set_source_rgba(color.red(), color.green(), color.blue(), color.alpha());
+
+    gtk::render_background(&style_context, context, 0.0, 0.0, width, height);
+
+    context.arc(
+        width / 2.0,
+        height / 2.0,
+        if width < height { width } else { height } / 2.0,
+        0.0,
+        2.0 * PI,
+    );
+    context.fill().unwrap();
+
+    println!("drawing area is {}x{}", width, height);
+
+    Inhibit(false)
+}
 
 // https://github.com/wmww/gtk-layer-shell/blob/master/examples/simple-example.c
 fn activate(application: &gtk::Application) {
@@ -14,16 +40,16 @@ fn activate(application: &gtk::Application) {
 
     // The margins are the gaps around the window's edges
     // Margins and anchors can be set like this...
-    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Left, 40);
-    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Right, 40);
-    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Top, 20);
+    // gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Left, 40);
+    // gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Right, 40);
+    // gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Top, 20);
 
     // ... or like this
     // Anchors are if the window is pinned to each edge of the output
     let anchors = [
         (gtk_layer_shell::Edge::Left, true),
         (gtk_layer_shell::Edge::Right, true),
-        (gtk_layer_shell::Edge::Top, false),
+        (gtk_layer_shell::Edge::Top, true),
         (gtk_layer_shell::Edge::Bottom, true),
     ];
 
@@ -31,7 +57,21 @@ fn activate(application: &gtk::Application) {
         gtk_layer_shell::set_anchor(&window, anchor, state);
     }
 
-    let canvas = gtk::DrawingArea::builder().opacity(0.5).build();
+    // how am I supposed to do this???
+    let mut ev_mask = EventMask::empty();
+    ev_mask.set(EventMask::TOUCH_MASK, true);
+    ev_mask.set(EventMask::BUTTON_PRESS_MASK, true);
+    ev_mask.set(EventMask::BUTTON_RELEASE_MASK, true);
+    ev_mask.set(EventMask::BUTTON_MOTION_MASK, true);
+
+    let canvas = gtk::DrawingArea::builder()
+        .opacity(0.5)
+        .hexpand(true)
+        .vexpand(true)
+        .events(ev_mask)
+        .build();
+
+    canvas.connect_draw(canvas_draw_callback);
 
     window.add(&canvas);
 

@@ -11,4 +11,6 @@ build = true
 [dependencies]
 gtk = "0.16.0"
 gio = "0.16.0"
+gdk = "0.16.0"
 gtk-layer-shell = "0.5.1"
+cairo-rs = "0.17.0"
