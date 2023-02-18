@@ -1,10 +1,13 @@
+use conv::prelude::*;
 use gdk::EventMask;
 use gio::prelude::*;
 use gtk::prelude::*;
-use std::f64::consts::PI;
+use serde::{Deserialize, Serialize};
+use std::{cell::RefCell, f64::consts::PI, rc::Rc};
 
 #[derive(Debug)]
 struct Wheel {
+    center: Option<(f64, f64)>,
     actions: Vec<ActionBubble>,
 }
 
@@ -20,7 +23,51 @@ impl Wheel {
     fn new() -> Self {
         let actions: Vec<ActionBubble> = serde_yaml::from_str(include_str!("default.yaml"))
             .expect("Error parsing yaml configuration!");
-        Wheel { actions }
+        Wheel {
+            center: None,
+            actions,
+        }
+    }
+
+    fn draw(&self, widget: &gtk::DrawingArea, context: &gdk::cairo::Context) -> Inhibit {
+        // if self.center.is_none() {
+        //     return Inhibit(false);
+        // }
+        let radius: f64 = 30.0;
+        let distance: f64 = 80.0;
+        let rbubble: f64 = 20.0;
+        let center = self.center.unwrap_or_else(|| {
+            let width: f64 = widget.allocated_width().into();
+            let height: f64 = widget.allocated_height().into();
+            (width / 2.0, height / 2.0)
+        });
+        let rotation: f64 = 2.0 * PI / self.actions.len().value_as::<f64>().unwrap();
+
+        let style_context = widget.style_context();
+        let color = style_context.color(style_context.state());
+        // context.set_source_rgba(color.red(), color.green(), color.blue(), color.alpha());
+        context.set_source_rgba(1.0, 0.0, 1.0, 0.5);
+
+        context.arc(center.0.into(), center.1.into(), radius, 0.0, 2.0 * PI);
+        context.fill().unwrap();
+
+        for i in 0..self.actions.len() {
+            let (sin, cos) = f64::sin_cos(rotation * i.value_as::<f64>().unwrap());
+            let xc = center.0 + (distance * sin);
+            let yc = center.1 - (distance * cos);
+            context.arc(xc, yc, rbubble, 0.0, 2.0 * PI);
+            context.fill().unwrap();
+        }
+
+        println!("drawn");
+        Inhibit(false)
+    }
+
+    fn on_button(&mut self, widget: &gtk::DrawingArea, event: &gdk::EventButton) -> Inhibit {
+        self.center = Some(event.position());
+
+        println!("received click");
+        Inhibit(false)
     }
 }
 
@@ -45,6 +92,14 @@ fn canvas_draw_callback(widget: &gtk::DrawingArea, context: &gdk::cairo::Context
 
     println!("drawing area is {}x{}", width, height);
 
+    Inhibit(false)
+}
+
+fn canvas_on_button(widget: &gtk::DrawingArea, event: &gdk::EventButton) -> Inhibit {
+    Inhibit(false)
+}
+
+fn canvas_on_button_release(widget: &gtk::DrawingArea, event: &gdk::EventButton) -> Inhibit {
     Inhibit(false)
 }
 
@@ -92,14 +147,24 @@ fn activate(application: &gtk::Application) {
         .events(ev_mask)
         .build();
 
-    canvas.connect_draw(canvas_draw_callback);
+    let wheel = Rc::new(RefCell::new(Wheel::new()));
+
+    let wheel_rc = wheel.clone();
+    canvas.connect_draw(move |widget, context| {
+        let wheel = wheel_rc.borrow();
+        wheel.draw(widget, context);
+        Inhibit(false)
+    });
+
+    let wheel_rc = wheel.clone();
+    canvas.connect_button_press_event(move |widget, context| {
+        let mut wheel = wheel_rc.borrow_mut();
+        wheel.on_button(widget, context);
+        Inhibit(false)
+    });
+    canvas.connect_button_release_event(canvas_on_button_release);
 
     window.add(&canvas);
-
-    // Set up a widget
-    // let label = gtk::Label::new(Some(""));
-    // label.set_markup("<span font_desc=\"20.0\">GTK Layer Shell example!</span>");
-    // window.add(&label);
     window.set_border_width(12);
     window.show_all()
 }
