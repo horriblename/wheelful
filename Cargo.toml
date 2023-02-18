@@ -14,3 +14,6 @@ gio = "0.16.0"
 gdk = "0.16.0"
 gtk-layer-shell = "0.5.1"
 cairo-rs = "0.17.0"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_yaml = "0.9.17"
+conv = "0.3.3"
