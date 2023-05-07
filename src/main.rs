@@ -4,7 +4,7 @@ use gio::prelude::*;
 use gtk::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, f64::consts::PI, rc::Rc};
-use windot::geometry::Coord;
+use wheelful::geometry::Coord;
 
 const GESTURE_THRESHOLD: f64 = 50.0;
 const ACTIVE_RADIUS: f64 = 30.0; // Bubble Radius of the currently focused bubble
@@ -246,7 +246,8 @@ fn set_visual(window: &gtk::ApplicationWindow, _screen: Option<&gdk::Screen>) {
 }
 
 fn main() {
-    let application = gtk::Application::new(Some("sh.wmww.gtk-layer-example"), Default::default());
+    let application =
+        gtk::Application::new(Some("com.github.horriblename.wheelful"), Default::default());
 
     application.connect_activate(|app| {
         activate(app);
