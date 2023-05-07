@@ -4,6 +4,7 @@ use gio::prelude::*;
 use gtk::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, f64::consts::PI, rc::Rc};
+use windot::geometry::Coord;
 
 const GESTURE_THRESHOLD: f64 = 50.0;
 const ACTIVE_RADIUS: f64 = 30.0; // Bubble Radius of the currently focused bubble
@@ -12,7 +13,7 @@ const BUBBLE_DISTANCE: f64 = 80.0; // distance between the centers of the main b
 
 #[derive(Debug)]
 struct Wheel {
-    center: Option<(f64, f64)>,
+    center: Option<Coord>,
     actions: Vec<ActionBubble>,
     final_command: Option<String>,
 }
@@ -40,18 +41,18 @@ impl Wheel {
         if self.center.is_none() {
             return Inhibit(false);
         }
-        let center = self.center.unwrap();
+        let center = self.center.as_ref().unwrap();
         let distance: f64 = BUBBLE_DISTANCE;
         let rotation: f64 = 2.0 * PI / self.actions.len().value_as::<f64>().unwrap();
 
         let style_context = widget.style_context();
-        let color = style_context.color(style_context.state());
+        let _color = style_context.color(style_context.state());
         // context.set_source_rgba(color.red(), color.green(), color.blue(), color.alpha());
         context.set_source_rgba(1.0, 0.0, 1.0, 0.5);
 
         context.arc(
-            center.0.into(),
-            center.1.into(),
+            center.x.into(),
+            center.y.into(),
             ACTIVE_RADIUS,
             0.0,
             2.0 * PI,
@@ -60,8 +61,8 @@ impl Wheel {
 
         for i in 0..self.actions.len() {
             let (sin, cos) = f64::sin_cos(rotation * i.value_as::<f64>().unwrap());
-            let xc = center.0 + (distance * sin);
-            let yc = center.1 - (distance * cos);
+            let xc = center.x + (distance * sin);
+            let yc = center.y - (distance * cos);
             context.arc(xc, yc, ACTION_RADIUS, 0.0, 2.0 * PI);
             context.fill().unwrap();
         }
@@ -69,8 +70,15 @@ impl Wheel {
         Inhibit(false)
     }
 
+    /// angle_in_radians should be in the range of [-pi, pi)
+    fn segment_number(&self, angle_in_radians: f64) -> usize {
+        assert!(angle_in_radians >= -PI && angle_in_radians < PI);
+
+        ((angle_in_radians + PI) / (2.0 * PI) * self.actions.len() as f64) as usize
+    }
+
     fn on_button(&mut self, widget: &gtk::DrawingArea, event: &gdk::EventButton) -> Inhibit {
-        self.center = Some(event.position());
+        self.center = Some(Coord::from_tuple(event.position()));
         widget.queue_draw();
 
         Inhibit(true)
@@ -81,22 +89,13 @@ impl Wheel {
             return Inhibit(false);
         }
 
-        let center = self.center.unwrap();
-        // let current = 
-        let (mx, my) = event.position();
-        let dx = mx - center.0;
-        let dy = center.1 - my;
-        let dist = f64::sqrt(dx * dx + dy * dy);
-        if dist > GESTURE_THRESHOLD {
-            let phi = f64::asin(dx / dy);
-            let segment = if phi.is_nan() {
-                0
-            } else {
-                (phi / self.actions.len().value_as::<f64>().unwrap()).round() as usize
-                    % self.actions.len()
-            };
+        let center = self.center.as_ref().unwrap();
+        let current = Coord::from_tuple(event.position());
+        if center.distance(&current) > GESTURE_THRESHOLD {
+            let phi = center.rotation_angle(&current);
+            let segment = self.segment_number(phi);
 
-            println!("gradient {} segment {}", phi, segment);
+            println!("angle {} segment {}", phi, segment);
             let focus = &mut self.actions[segment];
             if let Some(new_wheel) = focus.subwheel.take() {
                 println!("found subwheel");
@@ -104,10 +103,10 @@ impl Wheel {
                 let distance = BUBBLE_DISTANCE;
 
                 let (sin, cos) = f64::sin_cos(rotation * segment.value_as::<f64>().unwrap());
-                let xc = center.0 + (distance * sin);
-                let yc = center.1 - (distance * cos);
+                let xc = center.x + (distance * sin);
+                let yc = center.y - (distance * cos);
 
-                self.center = Some((xc, yc));
+                self.center = Some(Coord { x: xc, y: yc });
                 self.actions = new_wheel;
                 widget.queue_draw();
             }
@@ -125,22 +124,14 @@ impl Wheel {
             return Inhibit(false);
         }
 
-        let center = self.center.unwrap();
-        let (mx, my) = event.position();
-        let dx = mx - center.0;
-        let dy = center.1 - my;
-        let dist = f64::sqrt(dx * dx + dy * dy);
-        if dist < GESTURE_THRESHOLD {
+        // TODO maybe add Copy trait to Coord
+        let center = self.center.as_ref().unwrap();
+        let current = Coord::from_tuple(event.position());
+        if center.distance(&current) < GESTURE_THRESHOLD {
             return Inhibit(false);
         }
 
-        let gradient = dy / dx;
-        let segment = if gradient.is_nan() {
-            0
-        } else {
-            (gradient / self.actions.len().value_as::<f64>().unwrap()).round() as usize
-                % self.actions.len()
-        };
+        let segment = self.segment_number(center.rotation_angle(&current));
 
         let focus = &mut self.actions[segment];
         if let Some(cmd) = focus.command.take() {
@@ -273,5 +264,10 @@ mod test {
         let values: Vec<ActionBubble> = serde_yaml::from_str(include_str!("default.yaml")).unwrap();
         assert_eq!(values[0].name, "Music");
         println!("{values:?}");
+    }
+
+    #[test]
+    fn test_segment_number() {
+        // TODO
     }
 }
