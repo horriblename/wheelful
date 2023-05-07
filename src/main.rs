@@ -6,9 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, f64::consts::PI, rc::Rc};
 
 const GESTURE_THRESHOLD: f64 = 50.0;
-const ACTIVE_RADIUS: f64 = 30.0;
-const ACTION_RADIUS: f64 = 20.0;
-const BUBBLE_DISTANCE: f64 = 80.0;
+const ACTIVE_RADIUS: f64 = 30.0; // Bubble Radius of the currently focused bubble
+const ACTION_RADIUS: f64 = 20.0; // Bubble Radius of sub-bubbles
+const BUBBLE_DISTANCE: f64 = 80.0; // distance between the centers of the main bubble and other sub-bubbles
 
 #[derive(Debug)]
 struct Wheel {
@@ -37,15 +37,11 @@ impl Wheel {
     }
 
     fn draw(&self, widget: &gtk::DrawingArea, context: &gdk::cairo::Context) -> Inhibit {
-        // if self.center.is_none() {
-        //     return Inhibit(false);
-        // }
+        if self.center.is_none() {
+            return Inhibit(false);
+        }
+        let center = self.center.unwrap();
         let distance: f64 = BUBBLE_DISTANCE;
-        let center = self.center.unwrap_or_else(|| {
-            let width: f64 = widget.allocated_width().into();
-            let height: f64 = widget.allocated_height().into();
-            (width / 2.0, height / 2.0)
-        });
         let rotation: f64 = 2.0 * PI / self.actions.len().value_as::<f64>().unwrap();
 
         let style_context = widget.style_context();
@@ -85,20 +81,25 @@ impl Wheel {
             return Inhibit(false);
         }
 
+        let center = self.center.unwrap();
+        // let current = 
         let (mx, my) = event.position();
-        let dist = f64::sqrt(mx * mx + my * my);
+        let dx = mx - center.0;
+        let dy = center.1 - my;
+        let dist = f64::sqrt(dx * dx + dy * dy);
         if dist > GESTURE_THRESHOLD {
-            let gradient = my / mx;
-            let segment = if gradient.is_nan() {
+            let phi = f64::asin(dx / dy);
+            let segment = if phi.is_nan() {
                 0
             } else {
-                (gradient / self.actions.len().value_as::<f64>().unwrap()).round() as usize
+                (phi / self.actions.len().value_as::<f64>().unwrap()).round() as usize
                     % self.actions.len()
             };
 
+            println!("gradient {} segment {}", phi, segment);
             let focus = &mut self.actions[segment];
             if let Some(new_wheel) = focus.subwheel.take() {
-                let center = self.center.unwrap();
+                println!("found subwheel");
                 let rotation: f64 = 2.0 * PI / self.actions.len().value_as::<f64>().unwrap();
                 let distance = BUBBLE_DISTANCE;
 
@@ -124,14 +125,16 @@ impl Wheel {
             return Inhibit(false);
         }
 
+        let center = self.center.unwrap();
         let (mx, my) = event.position();
-        let dist = f64::sqrt(mx * mx + my * my);
-
+        let dx = mx - center.0;
+        let dy = center.1 - my;
+        let dist = f64::sqrt(dx * dx + dy * dy);
         if dist < GESTURE_THRESHOLD {
             return Inhibit(false);
         }
 
-        let gradient = my / mx;
+        let gradient = dy / dx;
         let segment = if gradient.is_nan() {
             0
         } else {
@@ -187,9 +190,9 @@ fn activate(application: &gtk::Application) {
 
     // The margins are the gaps around the window's edges
     // Margins and anchors can be set like this...
-    // gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Left, 40);
-    // gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Right, 40);
-    // gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Top, 20);
+    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Left, 300);
+    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Right, 40);
+    gtk_layer_shell::set_margin(&window, gtk_layer_shell::Edge::Top, 20);
 
     // ... or like this
     // Anchors are if the window is pinned to each edge of the output
